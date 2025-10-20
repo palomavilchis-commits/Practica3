@@ -1,0 +1,40 @@
+// Arma primero el circuito
+
+#include "max6675.h"
+#include <DHT.h>;
+
+int thermoDO = 4;
+int thermoCS = 5;
+int thermoCLK = 6;
+#define DHTPIN 3    
+#define DHTTYPE DHT11  
+DHT dht(DHTPIN, DHTTYPE); 
+
+//Variables 
+float temp1;
+float temp2; 
+
+MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  delay(500);
+  Serial.println("Iniciando lectura");
+}
+
+void loop() {
+  
+  temp1= dht.readTemperature();
+  Serial.print("Temp1: ");
+  Serial.print(temp1);
+  Serial.println("ºC");
+  
+  Serial.print("Temp2: ");
+  Serial.print(thermocouple.readCelsius());
+  Serial.println(" °C");
+  temp2=thermocouple.readCelsius();
+
+
+  delay(1000);
+}
