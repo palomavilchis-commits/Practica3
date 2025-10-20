@@ -1,0 +1,100 @@
+#Esta sección es después de armar el circuito y de verificar que el funcionamiento sea correcto
+#Cierra el IDE de arduono antes de ejecutar este código de python
+#Antes de ejecutar el código recuerda Instalar la bibliotecas necesarias en pycham, Se sugiere trabajar en el ambiente virtual creado en la clase pasada. 
+
+import serial
+import time
+import csv
+
+# Crea el archivo para almacenar los datos
+with open('Temperatura_segundos.csv', mode='w', newline='') as sensor_file:
+    sensor_writer = csv.writer(sensor_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    sensor_writer.writerow(["Temp1_DHT11", "Temp2_Termopar_K", "Tiempo"])
+
+# Variable para guardar el tiempo de inicio
+tiempo_inicio = None
+
+# Configuración del puerto serie para Arduino
+com = "/dev/cu.usbmodem14101"   # Cambia según tu puerto
+baud = 9600
+timeout = 1
+
+print(f"Conectando a {com} a {baud} baud...")
+
+try:
+    x = serial.Serial(com, baud, timeout=timeout)
+    time.sleep(2)  # Esperar a que Arduino se inicie
+
+    # Limpiar el buffer y descartar datos iniciales
+    x.reset_input_buffer()
+
+    # Inicia el contador de tiempo
+    tiempo_inicio = time.time()
+    print("Conectado. Esperando datos válidos...")
+    print(f"Contador iniciado en: {time.strftime('%H:%M:%S')}\n")
+
+    # Variables de temperaturas
+    temp1 = None  # DHT11
+    temp2 = None  # Termopar K
+
+    while x.isOpen():
+        try:
+            # Leer línea del serial
+            data = x.readline().decode('utf-8', errors='ignore').strip()
+
+            if data != '':
+                print(f"Dato recibido: '{data}'")
+
+                try:
+                    # Detectar Temp1 (DHT11)
+                    if 'Temp1:' in data and 'ºC' in data:
+                        # Extraer el número después de ':'
+                        temp_str = data.split(':')[-1].replace('ºC', '').strip()
+                        temp1 = float(temp_str)
+                        print(f"Temp1 (DHT11): {temp1}°C")
+
+                    # Detectar Temp2 (Termopar K)
+                    elif 'Temp2:' in data and '°C' in data:
+                        # Extraer el número después de ':'
+                        temp_str = data.split(':')[-1].replace('°C', '').strip()
+                        temp2 = float(temp_str)
+                        print(f"Temp2 (Termopar K): {temp2}°C")
+
+                        # Guardar cuando tengamos ambas temperaturas
+                        if temp1 is not None and temp2 is not None:
+                            # Calcular segundos transcurridos desde el inicio
+                            segundos_transcurridos = int(time.time() - tiempo_inicio)
+
+                            with open('Temperatura_segundos.csv', mode='a', newline='') as sensor_file:
+                                sensor_writer = csv.writer(sensor_file, delimiter=',', quotechar='"',
+                                                           quoting=csv.QUOTE_MINIMAL)
+                                sensor_writer.writerow([temp1, temp2, segundos_transcurridos])
+
+                            print(f" Datos guardados en CSV\n")
+
+                            # Resetear las variables para la siguiente lectura
+                            temp1 = None
+                            temp2 = None
+                        else:
+                            print(" Esperando Temp1 para completar el par...")
+
+                except (ValueError, IndexError) as e:
+                    print(f"Error al procesar: {data} - {e}")
+                except Exception as e:
+                    print(f"Error inesperado: {e}")
+
+        except UnicodeDecodeError as e:
+            print(f"Error de decodificación: {e} - Ignorando línea...")
+            continue
+
+        except KeyboardInterrupt:
+            print("\nDetenido por el usuario")
+            break
+
+except serial.SerialException as e:
+    print(f"Error de conexión: {e}")
+
+finally:
+    if 'x' in locals() and x.isOpen():
+        x.close()
+        print("Puerto cerrado")
